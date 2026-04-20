@@ -27,6 +27,8 @@ model User {
   reviews    Review[]
   favorites  Property[] @relation("Favorites")
   viewings   ViewingRequest[]
+  transactions Transaction[] @relation("PayerTransactions")
+  roommateProfile RoommateProfile?
   
   @@index([email])
 }
@@ -50,6 +52,8 @@ model Property {
   bedrooms              Int
   bathrooms             Int
   amenities             String[] // JSON array of amenities
+  bookingFee            Int?
+  isActive              Boolean @default(true)
   
   // Comrade Metrics
   waterReliability      Int @default(5)  // 1-10 scale
@@ -74,6 +78,7 @@ model Property {
   reviews               Review[]
   viewings              ViewingRequest[]
   favoritedBy           User[]   @relation("Favorites")
+  transactions          Transaction[]
   
   @@index([ownerId])
   @@index([area])
@@ -133,5 +138,107 @@ model SearchLog {
   results   Int      // Number of results returned
   createdAt DateTime @default(now())
   
+  @@index([createdAt])
+}
+
+enum Area {
+  KAHAWA_WENDANI
+  GITHURAI_44
+  KU_GATE_A
+  KU_GATE_B
+  KU_GATE_C
+  ROYSAMBU
+  KAHAWA_SUKARI
+}
+
+enum OccupancyType {
+  SINGLE
+  SHARED
+  EITHER
+}
+
+enum SleepRoutine {
+  EARLY_BIRD
+  NIGHT_OWL
+  FLEXIBLE
+}
+
+enum CleanlinessPreference {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum GuestPolicy {
+  NO_GUESTS
+  OCCASIONAL
+  FLEXIBLE
+}
+
+model RoommateProfile {
+  id                     String                 @id @default(cuid())
+  userId                 String                 @unique
+  preferredArea          Area?
+  budgetMin              Int?
+  budgetMax              Int?
+  capacityPreference     OccupancyType?
+  sleepRoutine           SleepRoutine           @default(FLEXIBLE)
+  cleanlinessPreference  CleanlinessPreference  @default(MEDIUM)
+  guestPolicy            GuestPolicy            @default(FLEXIBLE)
+  studyRoutine           String?
+  smoking                Boolean?
+  drinking               Boolean?
+  genderPreference       String?
+  lifestyleAnswers       Json?
+  compatibilityScore     Float?
+  compatibilityNotes     String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([preferredArea])
+}
+
+enum TransactionType {
+  BOOKING_FEE
+  RENT_PAYMENT
+  SECURITY_DEPOSIT
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  status            TransactionStatus @default(PENDING)
+  transactionType   TransactionType
+  amount            Int
+  currency          String            @default("KES")
+  phoneNumber       String
+  accountReference  String
+  checkoutRequestId String            @unique
+  merchantRequestId String?
+  receiptNumber     String?
+  failedReason      String?
+  mpesaCallback     Json?
+  paidAt            DateTime?
+  reconciledAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  payerId           String
+  payer             User              @relation("PayerTransactions", fields: [payerId], references: [id], onDelete: Cascade)
+
+  propertyId        String
+  property          Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([payerId])
+  @@index([propertyId])
+  @@index([status])
   @@index([createdAt])
 }

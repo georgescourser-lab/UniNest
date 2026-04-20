@@ -116,6 +116,17 @@ export async function POST(request: NextRequest) {
     })
 
     const isAccepted = stkResponse.ResponseCode === '0'
+    const checkoutRequestId = stkResponse.CheckoutRequestID
+
+    if (!checkoutRequestId) {
+      return NextResponse.json(
+        {
+          error: 'M-Pesa response did not include CheckoutRequestID',
+          response: stkResponse,
+        },
+        { status: 502 }
+      )
+    }
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -126,7 +137,7 @@ export async function POST(request: NextRequest) {
         phoneNumber,
         accountReference,
         status: isAccepted ? 'PROCESSING' : 'FAILED',
-        checkoutRequestId: stkResponse.CheckoutRequestID,
+        checkoutRequestId,
         merchantRequestId: stkResponse.MerchantRequestID,
         mpesaCallback: stkResponse as unknown as Prisma.InputJsonValue,
         failedReason: isAccepted

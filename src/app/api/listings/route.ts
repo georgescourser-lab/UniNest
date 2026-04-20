@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { SESSION_COOKIE_NAME } from '@/lib/session'
 
-type PropertyWithReviews = {
+type PropertyWithReviewsAndOwner = {
   reviews: Array<{ rating: number }>
-  landlord?: {
+  owner: {
     id: string
-    name: string | null
+    fullName: string
     email: string
     phone: string | null
-    idDocumentUrl: string | null
-    kraPinUrl: string | null
-    verificationStatus: string
-    isVerified: boolean
+    verified: boolean
   }
   [key: string]: unknown
 }
@@ -26,22 +23,18 @@ const mockListings = [
     bedrooms: 2,
     bathrooms: 1,
     amenities: ['WiFi', 'Water', 'Security'],
-    images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=500&h=400&fit=crop'],
+    images: [
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=500&h=400&fit=crop',
+    ],
     location: 'Close to Main Gate',
-    area: 'KAHAWA_WENDANI',
-    zone: 'Kahawa Wendani',
+    area: 'KAHAWA',
     latitude: 1.9437,
     longitude: 36.881,
-    waterReliability: 'RELIABLE',
-    hasWifi: true,
-    wifiQuality: 4,
-    securityScore: 5,
-    noiseLevel: 2,
-    lookingForRoommate: true,
-    landlordId: 'demo-landlord',
-    landlordName: 'Demo Landlord',
-    caretakerName: 'Caretaker John',
-    phoneNumber: '+254700000001',
+    waterReliability: 8,
+    wifiQuality: 7,
+    securityScore: 8,
+    noiseLevel: 3,
+    roommateWanted: true,
     isVerifiedProperty: true,
     reviews: [{ rating: 5 }, { rating: 4 }],
   },
@@ -53,22 +46,18 @@ const mockListings = [
     bedrooms: 1,
     bathrooms: 1,
     amenities: ['Water'],
-    images: ['https://images.unsplash.com/photo-1460317442991-0ec209397118?w=500&h=400&fit=crop'],
+    images: [
+      'https://images.unsplash.com/photo-1460317442991-0ec209397118?w=500&h=400&fit=crop',
+    ],
     location: 'Near shopping center',
-    area: 'GITHURAI_44',
-    zone: 'Githurai 44',
+    area: 'KWARE',
     latitude: 1.942,
     longitude: 36.889,
-    waterReliability: 'RATIONED',
-    hasWifi: false,
+    waterReliability: 5,
     wifiQuality: 0,
-    securityScore: 3,
-    noiseLevel: 4,
-    lookingForRoommate: false,
-    landlordId: 'demo-landlord-2',
-    landlordName: 'Demo Landlord 2',
-    caretakerName: 'Caretaker Mary',
-    phoneNumber: '+254700000002',
+    securityScore: 5,
+    noiseLevel: 5,
+    roommateWanted: false,
     isVerifiedProperty: false,
     reviews: [{ rating: 3 }],
   },
@@ -77,8 +66,7 @@ const mockListings = [
 function getMockResponse() {
   const data = mockListings.map((property) => {
     const avgRating = property.reviews.length
-      ? property.reviews.reduce((sum: number, review: { rating: number }) => sum + review.rating, 0) /
-        property.reviews.length
+      ? property.reviews.reduce((sum, review) => sum + review.rating, 0) / property.reviews.length
       : 0
 
     return {
@@ -97,17 +85,6 @@ function getMockResponse() {
   }
 }
 
-/**
- * GET /api/listings
- * Get all properties with optional filtering
- * Query params:
- * - area: Filter by area (KAHAWA_WENDANI, etc.)
- * - priceMin: Minimum price
- * - priceMax: Maximum price
- * - hasWifi: Filter by WiFi availability
- * - limit: Number of results (default: 12)
- * - offset: Pagination offset (default: 0)
- */
 export async function GET(request: NextRequest) {
   try {
     if (!process.env.DATABASE_URL) {
@@ -115,50 +92,42 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-
     const area = searchParams.get('area')
     const priceMin = searchParams.get('priceMin')
     const priceMax = searchParams.get('priceMax')
     const hasWifi = searchParams.get('hasWifi')
-    const limit = parseInt(searchParams.get('limit') || '12')
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const limit = parseInt(searchParams.get('limit') || '12', 10)
+    const offset = parseInt(searchParams.get('offset') || '0', 10)
 
-    // Build where clause
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     if (area) {
       where.area = area
     }
 
     if (priceMin || priceMax) {
-      where.price = {}
-      if (priceMin) {
-        where.price.gte = parseInt(priceMin)
-      }
-      if (priceMax) {
-        where.price.lte = parseInt(priceMax)
-      }
+      const priceFilter: { gte?: number; lte?: number } = {}
+      if (priceMin) priceFilter.gte = parseInt(priceMin, 10)
+      if (priceMax) priceFilter.lte = parseInt(priceMax, 10)
+      where.price = priceFilter
     }
 
     if (hasWifi === 'true') {
-      where.hasWifi = true
+      // wifiQuality > 0 indicates internet is available.
+      where.wifiQuality = { gt: 0 }
     }
 
-    // Fetch properties
     const [properties, total] = await Promise.all([
       prisma.property.findMany({
         where,
         include: {
-          landlord: {
+          owner: {
             select: {
               id: true,
-              name: true,
+              fullName: true,
               email: true,
               phone: true,
-              idDocumentUrl: true,
-              kraPinUrl: true,
-              verificationStatus: true,
-              isVerified: true,
+              verified: true,
             },
           },
           reviews: {
@@ -176,11 +145,10 @@ export async function GET(request: NextRequest) {
       prisma.property.count({ where }),
     ])
 
-    // Calculate average ratings
-    const formattedProperties = (properties as PropertyWithReviews[]).map((property) => {
+    const formattedProperties = (properties as PropertyWithReviewsAndOwner[]).map((property) => {
       const avgRating =
         property.reviews.length > 0
-          ? property.reviews.reduce((sum: number, review: { rating: number }) => sum + review.rating, 0) / property.reviews.length
+          ? property.reviews.reduce((sum, review) => sum + review.rating, 0) / property.reviews.length
           : 0
 
       return {
@@ -203,14 +171,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/listings
- * Create a new property (requires authentication)
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value
 
     if (!process.env.DATABASE_URL) {
@@ -231,7 +194,7 @@ export async function POST(request: NextRequest) {
       where: { id: sessionCookie },
       select: {
         id: true,
-        name: true,
+        fullName: true,
         phone: true,
       },
     })
@@ -240,49 +203,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    if (!body.title || !body.area || !body.zone || !body.location) {
+    if (!body.title || !body.area || !body.location) {
       return NextResponse.json(
-        { error: 'title, area, zone, and location are required' },
+        { error: 'title, area, and location are required' },
         { status: 400 }
       )
     }
 
     const property = await prisma.property.create({
       data: {
-        title: body.title,
-        description: body.description,
-        propertyType: body.propertyType || 'BEDSITTER',
-        price: body.price,
-        bookingFee: body.bookingFee,
-        capacity: body.capacity || 'SINGLE',
-        bedrooms: body.bedrooms,
-        bathrooms: body.bathrooms,
-        amenities: body.amenities || [],
-        location: body.location,
+        title: String(body.title),
+        description: String(body.description || ''),
+        price: Number(body.price || 0),
+        bedrooms: Number(body.bedrooms || 1),
+        bathrooms: Number(body.bathrooms || 1),
+        amenities: Array.isArray(body.amenities) ? body.amenities : [],
+        location: String(body.location),
         area: body.area,
-        zone: body.zone,
-        latitude: body.latitude,
-        longitude: body.longitude,
-        waterReliability: body.waterReliability,
-        hasWifi: body.hasWifi,
-        wifiQuality: body.wifiQuality,
-        securityScore: body.securityScore,
-        noiseLevel: body.noiseLevel,
-        lookingForRoommate: body.lookingForRoommate,
-        landlordId: user.id,
-        landlordName: body.landlordName || user.name || 'Landlord',
-        phoneNumber: body.phoneNumber || user.phone || '+254700000000',
-        caretakerName: body.caretakerName || null,
-        images: body.images || [],
+        latitude: body.latitude != null ? Number(body.latitude) : null,
+        longitude: body.longitude != null ? Number(body.longitude) : null,
+        waterReliability: Number(body.waterReliability || 5),
+        wifiQuality: Number(body.wifiQuality || 0),
+        securityScore: Number(body.securityScore || 5),
+        noiseLevel: Number(body.noiseLevel || 5),
+        roommateWanted: Boolean(body.roommateWanted ?? body.lookingForRoommate),
+        verifiedLandlord: false,
+        images: Array.isArray(body.images) ? body.images : [],
+        ownerId: user.id,
       },
     })
 
     return NextResponse.json(property, { status: 201 })
   } catch (error) {
     console.error('Error creating listing:', error)
-    return NextResponse.json(
-      { error: 'Failed to create listing' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to create listing' }, { status: 500 })
   }
 }

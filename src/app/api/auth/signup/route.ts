@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
+    if (!name) {
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    }
+
     if (password.length < 6) {
       return NextResponse.json(
         { error: 'Password must be at least 6 characters' },
@@ -36,19 +40,29 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hash(password, 10)
     const user = await prisma.user.create({
       data: {
-        name,
+        fullName: name,
         email,
         password: hashedPassword,
       },
       select: {
         id: true,
-        name: true,
+        fullName: true,
         email: true,
         role: true,
       },
     })
 
-    const response = NextResponse.json({ user }, { status: 201 })
+    const response = NextResponse.json(
+      {
+        user: {
+          id: user.id,
+          name: user.fullName,
+          email: user.email,
+          role: user.role,
+        },
+      },
+      { status: 201 }
+    )
     response.cookies.set(SESSION_COOKIE_NAME, user.id, {
       httpOnly: true,
       sameSite: 'lax',

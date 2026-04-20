@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       where: { email },
       select: {
         id: true,
-        name: true,
+        fullName: true,
         email: true,
         role: true,
         password: true,
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       {
         user: {
           id: user.id,
-          name: user.name,
+          name: user.fullName,
           email: user.email,
           role: user.role,
         },
