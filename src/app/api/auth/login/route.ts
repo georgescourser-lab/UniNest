@@ -78,15 +78,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to sign in' }, { status: 500 })
   }
 }
-            email: appUser.email,
-            role: appUser.role,
-          },
-        },
-        { status: 200 }
-      )
-    )
-  } catch (error) {
-    console.error('Login error:', error)
-    return NextResponse.json({ error: 'Failed to sign in' }, { status: 500 })
-  }
-}

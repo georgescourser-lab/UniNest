@@ -62,8 +62,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to get user info' }, { status: 500 })
   }
 }
-      { user: null, authenticated: false, error: 'Failed to check auth state' },
-      { status: 200 }
-    )
-  }
-}

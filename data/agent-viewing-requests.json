@@ -1,0 +1,30 @@
+[
+  {
+    "id": "VR-101",
+    "tenantName": "Mercy Wanjiku",
+    "tenantPhone": "0700000001",
+    "houseId": "fallback-1",
+    "houseTitle": "Sunny Bedsitter Near Main Gate",
+    "area": "Kahawa Wendani",
+    "propertyType": "Bedsitter",
+    "time": "Today, 4:30 PM",
+    "pickupPoint": "KU Main Gate",
+    "status": "Matched",
+    "feeStatus": "To be decided later",
+    "createdAt": "2026-04-20T16:56:49.291Z"
+  },
+  {
+    "id": "VR-102",
+    "tenantName": "Kevin Auma",
+    "tenantPhone": "0700000002",
+    "houseId": "fallback-2",
+    "houseTitle": "Quiet Single Room With WiFi",
+    "area": "Githurai 44",
+    "propertyType": "Single room",
+    "time": "Today, 6:00 PM",
+    "pickupPoint": "KU Gate A",
+    "status": "On the way",
+    "feeStatus": "To be decided later",
+    "createdAt": "2026-04-20T16:56:49.291Z"
+  }
+]

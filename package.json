@@ -12,7 +12,10 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "clean": "node scripts/clean-next.mjs",
+    "deploy": "cmd /c scripts\\deploy.bat",
+    "deploy:sh": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@prisma/client": "^5.1.0",
