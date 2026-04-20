@@ -1,0 +1,244 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  fullName  String
+  avatar    String?
+  phone     String?
+  bio       String?
+  role      UserRole   @default(STUDENT)
+  verified  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  properties Property[]
+  reviews    Review[]
+  favorites  Property[] @relation("Favorites")
+  viewings   ViewingRequest[]
+  transactions Transaction[] @relation("PayerTransactions")
+  roommateProfile RoommateProfile?
+  
+  @@index([email])
+}
+
+enum UserRole {
+  STUDENT
+  LANDLORD
+  ADMIN
+}
+
+model Property {
+  id                    String   @id @default(cuid())
+  title                 String
+  description           String
+  location              String
+  area                  KUArea
+  latitude              Float?
+  longitude             Float?
+  price                 Int // Monthly rent in KES
+  
+  bedrooms              Int
+  bathrooms             Int
+  amenities             String[] // JSON array of amenities
+  bookingFee            Int?
+  isActive              Boolean @default(true)
+  
+  // Comrade Metrics
+  waterReliability      Int @default(5)  // 1-10 scale
+  wifiQuality           Int @default(5)  // 1-10 scale
+  securityScore         Int @default(5)  // 1-10 scale
+  noiseLevel            Int @default(5)  // 1-10 scale
+  
+  // Verification & Status
+  verificationStatus    String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  isVerifiedProperty    Boolean  @default(false)
+  verifiedAt            DateTime?
+  verifiedLandlord      Boolean  @default(false)
+  roommateWanted        Boolean  @default(false)
+  
+  images                String[] // Array of image URLs
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  ownerId               String
+  owner                 User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  reviews               Review[]
+  viewings              ViewingRequest[]
+  favoritedBy           User[]   @relation("Favorites")
+  transactions          Transaction[]
+  
+  @@index([ownerId])
+  @@index([area])
+  @@index([createdAt])
+  @@index([verificationStatus])
+}
+
+enum KUArea {
+  KIKUYU
+  KWARE
+  KAHAWA
+  UTHIRU
+  KIKUYU_HIGH
+  KARURA
+  MUTHIGA
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  @@unique([authorId, propertyId])
+  @@index([propertyId])
+}
+
+model ViewingRequest {
+  id        String   @id @default(cuid())
+  status    String   @default("pending") // pending, approved, rejected, completed
+  scheduledDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+model SearchLog {
+  id        String   @id @default(cuid())
+  query     String
+  filters   String?  // JSON string of filters used
+  results   Int      // Number of results returned
+  createdAt DateTime @default(now())
+  
+  @@index([createdAt])
+}
+
+enum Area {
+  KAHAWA_WENDANI
+  GITHURAI_44
+  KU_GATE_A
+  KU_GATE_B
+  KU_GATE_C
+  ROYSAMBU
+  KAHAWA_SUKARI
+}
+
+enum OccupancyType {
+  SINGLE
+  SHARED
+  EITHER
+}
+
+enum SleepRoutine {
+  EARLY_BIRD
+  NIGHT_OWL
+  FLEXIBLE
+}
+
+enum CleanlinessPreference {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum GuestPolicy {
+  NO_GUESTS
+  OCCASIONAL
+  FLEXIBLE
+}
+
+model RoommateProfile {
+  id                     String                 @id @default(cuid())
+  userId                 String                 @unique
+  preferredArea          Area?
+  budgetMin              Int?
+  budgetMax              Int?
+  capacityPreference     OccupancyType?
+  sleepRoutine           SleepRoutine           @default(FLEXIBLE)
+  cleanlinessPreference  CleanlinessPreference  @default(MEDIUM)
+  guestPolicy            GuestPolicy            @default(FLEXIBLE)
+  studyRoutine           String?
+  smoking                Boolean?
+  drinking               Boolean?
+  genderPreference       String?
+  lifestyleAnswers       Json?
+  compatibilityScore     Float?
+  compatibilityNotes     String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([preferredArea])
+}
+
+enum TransactionType {
+  BOOKING_FEE
+  RENT_PAYMENT
+  SECURITY_DEPOSIT
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  status            TransactionStatus @default(PENDING)
+  transactionType   TransactionType
+  amount            Int
+  currency          String            @default("KES")
+  phoneNumber       String
+  accountReference  String
+  checkoutRequestId String            @unique
+  merchantRequestId String?
+  receiptNumber     String?
+  failedReason      String?
+  mpesaCallback     Json?
+  paidAt            DateTime?
+  reconciledAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  payerId           String
+  payer             User              @relation("PayerTransactions", fields: [payerId], references: [id], onDelete: Cascade)
+
+  propertyId        String
+  property          Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([payerId])
+  @@index([propertyId])
+  @@index([status])
+  @@index([createdAt])
+}
