@@ -1,5 +1,19 @@
 [
   {
+    "tenantName": "New tenant",
+    "tenantPhone": "",
+    "houseId": "2",
+    "houseTitle": "Budget Friendly Bedsitter",
+    "area": "GITHURAI_44",
+    "propertyType": "Bedsitter",
+    "time": "Today, 3:00 PM",
+    "pickupPoint": "Meet at Githurai 44",
+    "status": "Pending",
+    "feeStatus": "To be decided later",
+    "id": "VR-104",
+    "createdAt": "2026-04-19T11:59:06.219Z"
+  },
+  {
     "tenantName": "Test Tenant",
     "tenantPhone": "0712345678",
     "houseId": "fallback-1",

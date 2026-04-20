@@ -79,7 +79,7 @@ export default function SearchPageClient() {
 
   const [allListings, setAllListings] = useState<PropertyFeedItem[]>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('query') || '')
+  const [searchQuery, setSearchQuery] = useState(searchParams?.get('query') || '')
   const [filters, setFilters] = useState<FilterOptions>(initialFilters)
 
   useEffect(() => {
@@ -125,8 +125,8 @@ export default function SearchPageClient() {
   }, [])
 
   useEffect(() => {
-    const query = searchParams.get('query') || ''
-    const area = searchParams.get('area') || ''
+    const query = searchParams?.get('query') || ''
+    const area = searchParams?.get('area') || ''
 
     setSearchQuery(query)
     setFilters((current) => ({
