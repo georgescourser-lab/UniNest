@@ -11,242 +11,127 @@ datasource db {
 }
 
 model User {
-  id                 String             @id @default(uuid()) @db.Uuid
-  email              String             @unique
-  name               String?
-  password           String?            @map("password_hash")
-  phone              String?            @unique
-  role               UserRole           @default(STUDENT)
-  profileImage       String?            @map("profile_image")
-  bio                String?
-  isVerified         Boolean            @default(false) @map("is_verified")
-  verificationStatus VerificationStatus  @default(PENDING) @map("verification_status")
-  idDocumentUrl      String?            @map("id_document_url")
-  kraPinUrl          String?            @map("kra_pin_url")
-  supabaseAuthId     String?            @unique @map("supabase_auth_id")
-  properties         Property[]         @relation("LandlordProperties")
-  verifiedProperties Property[]         @relation("PropertyVerifiedBy")
-  roommateProfile    RoommateProfile?   @relation("UserRoommateProfile")
-  transactions       Transaction[]      @relation("UserTransactions")
-  reviews            Review[]           @relation("UserReviews")
-  searchLogs         SearchLog[]        @relation("UserSearchLogs")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  fullName  String
+  avatar    String?
+  phone     String?
+  bio       String?
+  role      UserRole   @default(STUDENT)
+  verified  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
+  properties Property[]
+  reviews    Review[]
+  favorites  Property[] @relation("Favorites")
+  viewings   ViewingRequest[]
+  
   @@index([email])
-  @@index([role])
-  @@index([verificationStatus])
-  @@map("users")
 }
 
 enum UserRole {
   STUDENT
   LANDLORD
   ADMIN
-  CARETAKER
 }
 
 model Property {
-  id                String             @id @default(uuid()) @db.Uuid
-  title             String
-  description       String?
-  propertyType      PropertyType       @default(BEDSITTER) @map("property_type")
-  area              Area
-  zone              String
-  location          String
-  latitude          Decimal            @db.Decimal(10, 7)
-  longitude         Decimal            @db.Decimal(10, 7)
-  price             Decimal            @db.Decimal(12, 2)
-  bookingFee        Decimal?           @db.Decimal(12, 2) @map("booking_fee")
-  capacity          OccupancyType      @default(SINGLE)
-  bedrooms          Int                @default(1)
-  bathrooms         Int                @default(1)
-  availableRooms    Int?               @map("available_rooms")
-  amenities         String[]           @default([])
-  images            String[]           @default([])
-  waterReliability  WaterType          @default(RELIABLE) @map("water_reliability")
-  hasWifi           Boolean            @default(false) @map("has_wifi")
-  wifiQuality       Int?               @map("wifi_quality")
-  securityScore     Int                @default(3) @map("security_score")
-  noiseLevel        Int                @default(3) @map("noise_level")
-  lookingForRoommate Boolean            @default(false) @map("looking_for_roommate")
-  isVerifiedProperty Boolean            @default(false) @map("is_verified_property")
-  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
-  verifiedById      String?            @db.Uuid @map("verified_by_id")
-  verifiedBy        User?              @relation("PropertyVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
-  verifiedAt        DateTime?          @map("verified_at")
-  landlordId        String             @db.Uuid @map("landlord_id")
-  landlord          User               @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
-  landlordName      String             @map("landlord_name")
-  caretakerName     String?            @map("caretaker_name")
-  phoneNumber       String             @map("phone_number")
-  isActive          Boolean            @default(true) @map("is_active")
-  availableFrom     DateTime?          @map("available_from")
-  transactions      Transaction[]      @relation("PropertyTransactions")
-  reviews           Review[]
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-
-  @@index([area, price])
-  @@index([landlordId])
+  id                    String   @id @default(cuid())
+  title                 String
+  description           String
+  location              String
+  area                  KUArea
+  latitude              Float?
+  longitude             Float?
+  price                 Int // Monthly rent in KES
+  
+  bedrooms              Int
+  bathrooms             Int
+  amenities             String[] // JSON array of amenities
+  
+  // Comrade Metrics
+  waterReliability      Int @default(5)  // 1-10 scale
+  wifiQuality           Int @default(5)  // 1-10 scale
+  securityScore         Int @default(5)  // 1-10 scale
+  noiseLevel            Int @default(5)  // 1-10 scale
+  
+  // Verification & Status
+  verificationStatus    String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  isVerifiedProperty    Boolean  @default(false)
+  verifiedAt            DateTime?
+  verifiedLandlord      Boolean  @default(false)
+  roommateWanted        Boolean  @default(false)
+  
+  images                String[] // Array of image URLs
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  ownerId               String
+  owner                 User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  reviews               Review[]
+  viewings              ViewingRequest[]
+  favoritedBy           User[]   @relation("Favorites")
+  
+  @@index([ownerId])
+  @@index([area])
+  @@index([createdAt])
   @@index([verificationStatus])
-  @@index([propertyType, capacity])
-  @@map("properties")
 }
 
-enum PropertyType {
-  BEDSITTER
-  HOSTEL
-  APARTMENT
-  STUDIO
-  SHARED_ROOM
-}
-
-enum OccupancyType {
-  SINGLE
-  TWO_SHARING
-}
-
-enum WaterType {
-  BOREHOLE
-  RATIONED
-  RELIABLE
-}
-
-enum VerificationStatus {
-  PENDING
-  VERIFIED
-  REJECTED
-}
-
-enum Area {
-  KAHAWA_WENDANI
-  KAHAWA_SUKARI
-  KM
-  MWIHOKO
-  GITHURAI_44
-  GITHURAI_45
-  RUIRU
-}
-
-enum SleepRoutine {
-  EARLY_BIRD
-  BALANCED
-  NIGHT_OWL
-  FLEXIBLE
-}
-
-enum CleanlinessPreference {
-  LOW
-  MEDIUM
-  HIGH
-  VERY_HIGH
-}
-
-enum GuestPolicy {
-  STRICT
-  LIMITED
-  FLEXIBLE
-}
-
-enum PaymentProvider {
-  MPESA_DARAJA
-}
-
-enum TransactionType {
-  BOOKING_FEE
-  RENT_PAYMENT
-  SECURITY_DEPOSIT
-}
-
-enum TransactionStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  CANCELLED
-  REFUNDED
-}
-
-model RoommateProfile {
-  id                    String                 @id @default(uuid()) @db.Uuid
-  userId                String                 @unique @db.Uuid @map("user_id")
-  user                  User                   @relation("UserRoommateProfile", fields: [userId], references: [id], onDelete: Cascade)
-  preferredArea         Area?                  @map("preferred_area")
-  budgetMin             Decimal?               @db.Decimal(12, 2) @map("budget_min")
-  budgetMax             Decimal?               @db.Decimal(12, 2) @map("budget_max")
-  capacityPreference    OccupancyType?         @map("capacity_preference")
-  sleepRoutine          SleepRoutine           @default(FLEXIBLE) @map("sleep_routine")
-  cleanlinessPreference CleanlinessPreference  @default(MEDIUM) @map("cleanliness_preference")
-  guestPolicy           GuestPolicy            @default(FLEXIBLE) @map("guest_policy")
-  studyRoutine          String?                @map("study_routine")
-  smoking               Boolean?               @map("smoking")
-  drinking              Boolean?               @map("drinking")
-  genderPreference      String?                @map("gender_preference")
-  lifestyleAnswers      Json?                  @map("lifestyle_answers")
-  compatibilityScore    Int?                   @map("compatibility_score")
-  compatibilityNotes    Json?                  @map("compatibility_notes")
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-
-  @@map("roommate_profiles")
-}
-
-model Transaction {
-  id                  String             @id @default(uuid()) @db.Uuid
-  payerId             String             @db.Uuid @map("payer_id")
-  payer               User               @relation("UserTransactions", fields: [payerId], references: [id], onDelete: Cascade)
-  propertyId          String             @db.Uuid @map("property_id")
-  property            Property           @relation("PropertyTransactions", fields: [propertyId], references: [id], onDelete: Cascade)
-  transactionType     TransactionType    @default(BOOKING_FEE) @map("transaction_type")
-  provider            PaymentProvider     @default(MPESA_DARAJA)
-  status              TransactionStatus   @default(PENDING)
-  amount              Decimal            @db.Decimal(12, 2)
-  currency            String             @default("KES")
-  phoneNumber         String?            @map("phone_number")
-  checkoutRequestId   String?            @unique @map("checkout_request_id")
-  merchantRequestId   String?            @unique @map("merchant_request_id")
-  receiptNumber       String?            @unique @map("receipt_number")
-  accountReference    String?            @map("account_reference")
-  escrowEnabled       Boolean            @default(true) @map("escrow_enabled")
-  mpesaCallback       Json?              @map("mpesa_callback")
-  failedReason        String?            @map("failed_reason")
-  paidAt              DateTime?          @map("paid_at")
-  reconciledAt        DateTime?          @map("reconciled_at")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
-
-  @@index([payerId])
-  @@index([propertyId, status])
-  @@index([status])
-  @@map("transactions")
+enum KUArea {
+  KIKUYU
+  KWARE
+  KAHAWA
+  UTHIRU
+  KIKUYU_HIGH
+  KARURA
+  MUTHIGA
 }
 
 model Review {
-  id          String   @id @default(uuid()) @db.Uuid
-  rating      Int
-  comment     String
-  authorId    String   @db.Uuid @map("author_id")
-  author      User     @relation("UserReviews", fields: [authorId], references: [id], onDelete: Cascade)
-  propertyId  String   @db.Uuid @map("property_id")
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  @@unique([authorId, propertyId])
   @@index([propertyId])
-  @@index([authorId])
-  @@map("reviews")
+}
+
+model ViewingRequest {
+  id        String   @id @default(cuid())
+  status    String   @default("pending") // pending, approved, rejected, completed
+  scheduledDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([propertyId])
+  @@index([status])
 }
 
 model SearchLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @db.Uuid @map("user_id")
-  user      User?    @relation("UserSearchLogs", fields: [userId], references: [id], onDelete: SetNull)
-  area      Area?
-  filters   Json?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([area])
-  @@map("search_logs")
+  id        String   @id @default(cuid())
+  query     String
+  filters   String?  // JSON string of filters used
+  results   Int      // Number of results returned
+  createdAt DateTime @default(now())
+  
+  @@index([createdAt])
 }
