@@ -18,11 +18,9 @@
     "esModuleInterop": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
-    "ignoreDeprecations": "5.0",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     },
     "jsx": "preserve",
