@@ -135,15 +135,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to initiate M-Pesa payment' }, { status: 500 })
   }
 }
-      { status: isAccepted ? 200 : 502 }
-    )
-  } catch (error) {
-    console.error('STK push initiation error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to initiate M-Pesa payment',
-      },
-      { status: 500 }
-    )
-  }
-}

@@ -137,10 +137,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update roommate profile' }, { status: 500 })
   }
 }
-
-    return NextResponse.json({ profile }, { status: 200 })
-  } catch (error) {
-    console.error('Roommate profile POST error:', error)
-    return NextResponse.json({ error: 'Failed to save roommate profile' }, { status: 500 })
-  }
-}

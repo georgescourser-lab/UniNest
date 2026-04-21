@@ -88,13 +88,63 @@ export async function getPropertyById(
 ): Promise<{
   id: string
   title: string
+  description: string
+  location: string
+  area: string
   price: number
+  bedrooms: number
+  bathrooms: number
   bookingFee: number | null
+  amenities: string[]
+  images: string[]
+  latitude: number | null
+  longitude: number | null
+  waterReliability: number
+  wifiQuality: number
+  securityScore: number
+  noiseLevel: number
   isActive: boolean
+  isVerifiedProperty: boolean
+  roommateWanted: boolean
+  owner: {
+    id: string
+    fullName: string
+    email: string
+    phone: string | null
+    verified: boolean
+  }
+  reviews: Array<{ rating: number }>
+  reviewCount: number
+  averageRating: number
 } | null> {
   const { data, error } = await supabase
     .from('properties')
-    .select('id, title, price, bookingFee, isActive')
+    .select(
+      `
+        id,
+        title,
+        description,
+        location,
+        area,
+        price,
+        bedrooms,
+        bathrooms,
+        bookingFee,
+        amenities,
+        images,
+        latitude,
+        longitude,
+        waterReliability,
+        wifiQuality,
+        securityScore,
+        noiseLevel,
+        isActive,
+        isVerifiedProperty,
+        roommateWanted,
+        owner:users(id, fullName, email, phone, verified),
+        reviews(rating)
+      `
+    )
     .eq('id', propertyId)
     .single()
 
@@ -105,7 +155,20 @@ export async function getPropertyById(
     throw error
   }
 
-  return data
+  const reviews = ((data as { reviews?: Array<{ rating: number }> }).reviews || []) as Array<{
+    rating: number
+  }>
+  const averageRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+      : 0
+
+  return {
+    ...(data as Record<string, any>),
+    reviews,
+    reviewCount: reviews.length,
+    averageRating: parseFloat(averageRating.toFixed(1)),
+  } as any
 }
 
 export async function getPropertiesWithFilters(
@@ -128,8 +191,11 @@ export async function getPropertiesWithFilters(
     price: number
     bedrooms: number
     bathrooms: number
+    bookingFee: number | null
     amenities: string[]
     images: string[]
+    latitude: number | null
+    longitude: number | null
     waterReliability: number
     wifiQuality: number
     securityScore: number
@@ -164,8 +230,11 @@ export async function getPropertiesWithFilters(
         price,
         bedrooms,
         bathrooms,
+        bookingFee,
         amenities,
         images,
+        latitude,
+        longitude,
         waterReliability,
         wifiQuality,
         securityScore,

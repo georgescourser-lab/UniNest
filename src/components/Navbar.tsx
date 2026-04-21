@@ -67,14 +67,42 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-border/80 bg-background/80 backdrop-blur-xl">
       <div className="section-wrap">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="flex items-center gap-3 flex-shrink-0">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-electric-green to-electric-blue flex items-center justify-center text-black font-black text-xs tracking-wide">
-              UNI
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-electric-green to-electric-blue flex items-center justify-center text-black font-black text-xs tracking-wide">
+                UNI
+              </div>
+              <span className="hidden font-display text-lg font-bold text-foreground sm:inline">
+                Uninest
+              </span>
+            </Link>
+
+            <div className="hidden lg:flex items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-electric-blue hover:text-foreground"
+              >
+                <Users size={16} />
+                Dashboard
+              </Link>
+              <Link
+                href="/agent/dashboard"
+                className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-electric-blue hover:text-foreground"
+              >
+                <MapPin size={16} />
+                Viewings
+              </Link>
+              {isAuthenticated && userRole === 'ADMIN' && (
+                <Link
+                  href="/admin/trust-safety"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-electric-blue hover:text-foreground"
+                >
+                  <ShieldCheck size={16} />
+                  Trust & Safety
+                </Link>
+              )}
             </div>
-            <span className="hidden font-display text-lg font-bold text-foreground sm:inline">
-              Uninest
-            </span>
-          </Link>
+          </div>
 
           <div className="hidden md:flex flex-1 mx-8">
             <form onSubmit={handleSearch} className="w-full relative">
@@ -98,29 +126,6 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-electric-blue hover:text-foreground"
-            >
-              <Users size={16} />
-              Dashboard
-            </Link>
-            <Link
-              href="/agent/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-electric-blue hover:text-foreground"
-            >
-              <MapPin size={16} />
-              Viewings
-            </Link>
-            {isAuthenticated && userRole === 'ADMIN' && (
-              <Link
-                href="/admin/trust-safety"
-                className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-electric-blue hover:text-foreground"
-              >
-                <ShieldCheck size={16} />
-                Trust & Safety
-              </Link>
-            )}
             <ThemeToggle />
             {isAuthenticated ? (
               <>
