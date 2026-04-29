@@ -410,6 +410,226 @@ export async function upsertRoommateProfile(
 }
 
 // ============================================================================
+// REALTIME CHAT QUERIES
+// ============================================================================
+
+export type RoommateChatMessage = {
+  id: string
+  area: string
+  senderId: string
+  senderName: string
+  message: string
+  createdAt: string
+}
+
+export async function getRoommateChatMessages(
+  supabase: SupabaseClient,
+  area: string,
+  limit = 60
+): Promise<RoommateChatMessage[]> {
+  const { data, error } = await supabase
+    .from('roommate_chat_messages')
+    .select('id, area, sender_id, sender_name, message, created_at')
+    .eq('area', area)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+
+  return (data || [])
+    .map((row: any) => ({
+      id: row.id,
+      area: row.area,
+      senderId: row.sender_id,
+      senderName: row.sender_name,
+      message: row.message,
+      createdAt: row.created_at,
+    }))
+    .reverse()
+}
+
+export async function createRoommateChatMessage(
+  supabase: SupabaseClient,
+  payload: {
+    area: string
+    senderId: string
+    senderName: string
+    message: string
+  }
+): Promise<RoommateChatMessage> {
+  const { data, error } = await supabase
+    .from('roommate_chat_messages')
+    .insert({
+      area: payload.area,
+      sender_id: payload.senderId,
+      sender_name: payload.senderName,
+      message: payload.message,
+    })
+    .select('id, area, sender_id, sender_name, message, created_at')
+    .single()
+
+  if (error) throw error
+
+  return {
+    id: data.id,
+    area: data.area,
+    senderId: data.sender_id,
+    senderName: data.sender_name,
+    message: data.message,
+    createdAt: data.created_at,
+  }
+}
+
+// ============================================================================
+// LIVE VIEWING REQUEST QUERIES
+// ============================================================================
+
+export type LiveViewingRequest = {
+  id: string
+  tenantName: string
+  tenantPhone: string
+  houseId: string
+  houseTitle: string
+  area: string
+  propertyType: string
+  time: string
+  pickupPoint: string
+  status: 'Matched' | 'Pending' | 'On the way'
+  feeStatus: 'To be decided later'
+  requesterUserId: string
+  ownerUserId: string | null
+  createdAt: string
+}
+
+export async function getPropertyOwnerId(
+  supabase: SupabaseClient,
+  propertyId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('properties')
+    .select('ownerId')
+    .eq('id', propertyId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null
+    }
+    throw error
+  }
+
+  return (data as { ownerId: string }).ownerId
+}
+
+export async function getLiveViewingRequestsForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<LiveViewingRequest[]> {
+  const { data, error } = await supabase
+    .from('agent_viewing_requests')
+    .select('*')
+    .or(`requester_user_id.eq.${userId},owner_user_id.eq.${userId}`)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    tenantName: row.tenant_name,
+    tenantPhone: row.tenant_phone || '',
+    houseId: row.house_id,
+    houseTitle: row.house_title,
+    area: row.area,
+    propertyType: row.property_type,
+    time: row.time_label,
+    pickupPoint: row.pickup_point,
+    status: row.status,
+    feeStatus: row.fee_status,
+    requesterUserId: row.requester_user_id,
+    ownerUserId: row.owner_user_id,
+    createdAt: row.created_at,
+  }))
+}
+
+export async function createLiveViewingRequest(
+  supabase: SupabaseClient,
+  payload: {
+    tenantName: string
+    tenantPhone: string
+    houseId: string
+    houseTitle: string
+    area: string
+    propertyType: string
+    time: string
+    pickupPoint: string
+    requesterUserId: string
+    ownerUserId: string | null
+  }
+): Promise<LiveViewingRequest> {
+  const { data, error } = await supabase
+    .from('agent_viewing_requests')
+    .insert({
+      tenant_name: payload.tenantName,
+      tenant_phone: payload.tenantPhone,
+      house_id: payload.houseId,
+      house_title: payload.houseTitle,
+      area: payload.area,
+      property_type: payload.propertyType,
+      time_label: payload.time,
+      pickup_point: payload.pickupPoint,
+      status: 'Pending',
+      fee_status: 'To be decided later',
+      requester_user_id: payload.requesterUserId,
+      owner_user_id: payload.ownerUserId,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  return {
+    id: data.id,
+    tenantName: data.tenant_name,
+    tenantPhone: data.tenant_phone || '',
+    houseId: data.house_id,
+    houseTitle: data.house_title,
+    area: data.area,
+    propertyType: data.property_type,
+    time: data.time_label,
+    pickupPoint: data.pickup_point,
+    status: data.status,
+    feeStatus: data.fee_status,
+    requesterUserId: data.requester_user_id,
+    ownerUserId: data.owner_user_id,
+    createdAt: data.created_at,
+  }
+}
+
+// ============================================================================
+// VACANCY QUERIES
+// ============================================================================
+
+export async function updatePropertyVacancyStatus(
+  supabase: SupabaseClient,
+  propertyId: string,
+  isActive: boolean
+): Promise<{ id: string; isActive: boolean; title: string }> {
+  const { data, error } = await supabase
+    .from('properties')
+    .update({
+      isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', propertyId)
+    .select('id, isActive, title')
+    .single()
+
+  if (error) throw error
+
+  return data as { id: string; isActive: boolean; title: string }
+}
+
+// ============================================================================
 // TRANSACTION QUERIES
 // ============================================================================
 

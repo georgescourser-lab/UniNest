@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -10,11 +10,30 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [nextPath, setNextPath] = useState('/profile')
+
+  type SignupResponse = {
+    authenticated?: boolean
+    requiresEmailVerification?: boolean
+    message?: string
+    error?: string
+  }
+
+  useEffect(() => {
+    const requestedNext = new URLSearchParams(window.location.search).get('next')
+    const safeNextPath =
+      requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+        ? requestedNext
+        : '/profile'
+    setNextPath(safeNextPath)
+  }, [])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
+    setInfo('')
     setIsSubmitting(true)
 
     try {
@@ -24,13 +43,19 @@ export default function SignupPage() {
         body: JSON.stringify({ name, email, password }),
       })
 
+      const payload = (await response.json().catch(() => ({}))) as SignupResponse
+
       if (response.ok) {
-        router.push('/profile')
-        router.refresh()
+        if (payload.authenticated) {
+          router.push(nextPath)
+          router.refresh()
+          return
+        }
+
+        setInfo(payload.message || 'Account created. Please sign in to continue.')
         return
       }
 
-      const payload = await response.json().catch(() => ({ error: 'Sign up failed' }))
       setError(payload.error || 'Sign up failed')
     } catch {
       setError('Network error. Please try again.')
@@ -83,12 +108,16 @@ export default function SignupPage() {
           >
             {isSubmitting ? 'Creating Account...' : 'Sign Up'}
           </button>
+          {info && <p className="text-sm text-emerald-600">{info}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
 
         <p className="mt-4 text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-electric-blue hover:underline">
+          <Link
+            href={nextPath !== '/profile' ? `/login?next=${encodeURIComponent(nextPath)}` : '/login'}
+            className="font-medium text-electric-blue hover:underline"
+          >
             Sign in
           </Link>
         </p>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Manrope, Space_Grotesk } from 'next/font/google'
+import Link from 'next/link'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 
@@ -53,19 +54,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <h4 className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">About</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/about" className="hover:text-foreground transition">
                       About Us
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/faq" className="hover:text-foreground transition">
                       FAQ
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/blog" className="hover:text-foreground transition">
                       Blog
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
@@ -73,19 +74,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <h4 className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">Community</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/reviews" className="hover:text-foreground transition">
                       Reviews
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/trust-safety" className="hover:text-foreground transition">
                       Trust & Safety
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/feedback" className="hover:text-foreground transition">
                       Feedback
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
@@ -93,19 +94,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <h4 className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">Support</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/contact" className="hover:text-foreground transition">
                       Contact Us
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/help-center" className="hover:text-foreground transition">
                       Help Center
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/report-issue" className="hover:text-foreground transition">
                       Report Issue
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
@@ -113,14 +114,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <h4 className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">Legal</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/privacy-policy" className="hover:text-foreground transition">
                       Privacy Policy
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-foreground transition">
+                    <Link href="/terms-of-service" className="hover:text-foreground transition">
                       Terms of Service
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </div>

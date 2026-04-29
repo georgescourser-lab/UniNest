@@ -9,6 +9,7 @@ import FilterPanel, {
   type ListingCategory,
 } from '@/components/FilterPanel'
 import PropertyFeed, { type PropertyFeedItem } from '@/components/PropertyFeed'
+import { createClient } from '@/utils/supabase/client'
 
 interface ApiProperty {
   id: string
@@ -82,46 +83,64 @@ export default function SearchPageClient() {
   const [searchQuery, setSearchQuery] = useState(searchParams?.get('query') || '')
   const [filters, setFilters] = useState<FilterOptions>(initialFilters)
 
-  useEffect(() => {
-    const loadListings = async () => {
-      try {
-        const response = await fetch('/api/listings', { cache: 'no-store' })
-        if (!response.ok) {
-          return
-        }
-
-        const payload = (await response.json()) as ApiResponse
-        const normalized = payload.data.map<PropertyFeedItem>((item) => {
-          const areaCode = String(item.area || '')
-          return {
-            id: item.id,
-            title: item.title,
-            price: Number(item.price),
-            area: areaNameMap[areaCode] || item.zone || item.area,
-            location: item.location,
-            bedrooms: item.bedrooms,
-            bathrooms: item.bathrooms,
-            image:
-              item.images?.[0] ||
-              'https://images.unsplash.com/photo-1493666438817-866a91353ca9?w=800&h=600&fit=crop',
-            latitude: Number(item.latitude),
-            longitude: Number(item.longitude),
-            isVerifiedProperty:
-              Boolean(item.isVerifiedProperty) || item.verificationStatus === 'VERIFIED',
-            reviewCount: item.reviewCount || 0,
-            averageRating: item.averageRating || 4.2,
-            category: categoryFromType(item.propertyType),
-            capacity: capacityFromListing(item),
-          }
-        })
-
-        setAllListings(normalized)
-      } catch {
-        setAllListings([])
+  const loadListings = async () => {
+    try {
+      const response = await fetch('/api/listings', { cache: 'no-store' })
+      if (!response.ok) {
+        return
       }
-    }
 
+      const payload = (await response.json()) as ApiResponse
+      const normalized = payload.data.map<PropertyFeedItem>((item) => {
+        const areaCode = String(item.area || '')
+        return {
+          id: item.id,
+          title: item.title,
+          price: Number(item.price),
+          area: areaNameMap[areaCode] || item.zone || item.area,
+          location: item.location,
+          bedrooms: item.bedrooms,
+          bathrooms: item.bathrooms,
+          image:
+            item.images?.[0] ||
+            'https://images.unsplash.com/photo-1493666438817-866a91353ca9?w=800&h=600&fit=crop',
+          latitude: Number(item.latitude),
+          longitude: Number(item.longitude),
+          isVerifiedProperty:
+            Boolean(item.isVerifiedProperty) || item.verificationStatus === 'VERIFIED',
+          reviewCount: item.reviewCount || 0,
+          averageRating: item.averageRating || 4.2,
+          category: categoryFromType(item.propertyType),
+          capacity: capacityFromListing(item),
+        }
+      })
+
+      setAllListings(normalized)
+    } catch {
+      setAllListings([])
+    }
+  }
+
+  useEffect(() => {
     loadListings()
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('live-property-vacancy')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'properties' },
+        () => {
+          loadListings()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {

@@ -15,6 +15,7 @@ import {
   Star,
   Search,
 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 
 type PostedHouse = {
   id: string
@@ -181,6 +182,36 @@ export default function AgentDashboardPage() {
   }, [])
 
   useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('agent-live-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agent_viewing_requests' },
+        async () => {
+          try {
+            const response = await fetch('/api/agent/viewing-requests', { cache: 'no-store' })
+            if (!response.ok) {
+              return
+            }
+
+            const payload = (await response.json()) as { data?: ViewingRequest[] }
+            if (payload.data) {
+              setRequests(payload.data)
+            }
+          } catch {
+            // Ignore transient realtime refetch errors.
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
     const loadHouses = async () => {
       try {
         const response = await fetch('/api/listings?limit=6', { cache: 'no-store' })
@@ -219,6 +250,50 @@ export default function AgentDashboardPage() {
     }
 
     loadHouses()
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('agent-live-vacancy')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'properties' },
+        async () => {
+          try {
+            const response = await fetch('/api/listings?limit=6', { cache: 'no-store' })
+            if (!response.ok) {
+              return
+            }
+
+            const payload = (await response.json()) as { data?: PostedHouse[] }
+            const normalized = (payload.data || []).map((house) => ({
+              id: house.id,
+              title: house.title,
+              area: house.area,
+              zone: house.zone,
+              location: house.location,
+              price: Number(house.price),
+              bookingFee: house.bookingFee ? Number(house.bookingFee) : null,
+              images: house.images || [],
+              isVerifiedProperty: house.isVerifiedProperty,
+              lookingForRoommate: house.lookingForRoommate,
+            }))
+
+            if (normalized.length > 0) {
+              setPostedHouses(normalized)
+              setSelectedHouseId((current) => current || normalized[0]?.id || '')
+            }
+          } catch {
+            // Ignore transient realtime refetch errors.
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const stats = useMemo(() => {

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  createAgentViewingRequest,
-  getAgentViewingRequests,
-  type AgentViewingRequest,
-} from '@/lib/agent-viewing-store'
 import { getCurrentAppUser } from '@/lib/current-user'
+import { createRouteHandlerClient } from '@/utils/supabase/route'
+import {
+  createLiveViewingRequest,
+  getLiveViewingRequestsForUser,
+  getPropertyOwnerId,
+  type LiveViewingRequest,
+} from '@/utils/supabase/queries'
 
 interface CreateViewingRequestBody {
   tenantName?: string
@@ -17,9 +19,15 @@ interface CreateViewingRequestBody {
   pickupPoint?: string
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const requests = await getAgentViewingRequests()
+    const { user, unauthorized } = await getCurrentAppUser(request)
+    if (!user || unauthorized) {
+      return unauthorized || NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const { supabase } = createRouteHandlerClient(request)
+    const requests = await getLiveViewingRequestsForUser(supabase, user.id)
     return NextResponse.json({ data: requests }, { status: 200 })
   } catch (error) {
     console.error('Agent viewing request GET error:', error)
@@ -51,7 +59,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const payload: Omit<AgentViewingRequest, 'id' | 'createdAt'> = {
+    const { supabase } = createRouteHandlerClient(request)
+    const ownerUserId = await getPropertyOwnerId(supabase, String(body.houseId || '').trim())
+
+    const payload: Omit<LiveViewingRequest, 'id' | 'createdAt' | 'status' | 'feeStatus'> = {
       tenantName: String(body.tenantName || 'New tenant').trim(),
       tenantPhone: String(body.tenantPhone || '').trim(),
       houseId: String(body.houseId || '').trim(),
@@ -60,11 +71,15 @@ export async function POST(request: NextRequest) {
       propertyType: String(body.propertyType || '').trim(),
       time: String(body.time || '').trim(),
       pickupPoint: String(body.pickupPoint || '').trim(),
-      status: 'Pending',
-      feeStatus: 'To be decided later',
+      requesterUserId: user.id,
+      ownerUserId,
     }
 
-    const created = await createAgentViewingRequest(payload)
+    const created = await createLiveViewingRequest(supabase, {
+      ...payload,
+      ownerUserId,
+    })
+
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (error) {
     console.error('Agent viewing request POST error:', error)

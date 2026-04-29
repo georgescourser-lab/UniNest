@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { createClient } from '@/utils/supabase/client'
 
 type SleepRoutine = 'EARLY_BIRD' | 'BALANCED' | 'NIGHT_OWL' | 'FLEXIBLE'
 type CleanlinessPreference = 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH'
@@ -27,6 +28,15 @@ interface QuizState {
   smoking: boolean
   drinking: boolean
   genderPreference: string
+}
+
+interface ChatMessage {
+  id: string
+  area: string
+  senderId: string
+  senderName: string
+  message: string
+  createdAt: string
 }
 
 const initialState: QuizState = {
@@ -84,6 +94,35 @@ export default function RoommateMatchPage() {
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [currentUserId, setCurrentUserId] = useState('')
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatSending, setChatSending] = useState(false)
+
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store' })
+        if (!response.ok) {
+          return
+        }
+
+        const payload = (await response.json()) as {
+          user?: { id?: string } | null
+          authenticated?: boolean
+        }
+
+        if (payload.authenticated && payload.user?.id) {
+          setCurrentUserId(payload.user.id)
+        }
+      } catch {
+        setCurrentUserId('')
+      }
+    }
+
+    loadCurrentUser()
+  }, [])
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -135,6 +174,80 @@ export default function RoommateMatchPage() {
 
     loadProfile()
   }, [])
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      setChatLoading(true)
+      try {
+        const area = state.preferredArea
+        const response = await fetch(`/api/roommate/chat?area=${encodeURIComponent(area)}`, {
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          setChatMessages([])
+          return
+        }
+
+        const payload = (await response.json()) as { data?: ChatMessage[] }
+        setChatMessages(payload.data || [])
+      } finally {
+        setChatLoading(false)
+      }
+    }
+
+    loadMessages()
+  }, [state.preferredArea])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const area = state.preferredArea
+
+    const channel = supabase
+      .channel(`roommate-chat-${area}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'roommate_chat_messages',
+          filter: `area=eq.${area}`,
+        },
+        (payload) => {
+          const message = payload.new as {
+            id: string
+            area: string
+            sender_id: string
+            sender_name: string
+            message: string
+            created_at: string
+          }
+
+          setChatMessages((current) => {
+            if (current.some((item) => item.id === message.id)) {
+              return current
+            }
+
+            return [
+              ...current,
+              {
+                id: message.id,
+                area: message.area,
+                senderId: message.sender_id,
+                senderName: message.sender_name,
+                message: message.message,
+                createdAt: message.created_at,
+              },
+            ]
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [state.preferredArea])
 
   const compatibilityScore = useMemo(() => {
     const base =
@@ -201,6 +314,41 @@ export default function RoommateMatchPage() {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  const sendChatMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const message = chatInput.trim()
+    if (!message) {
+      return
+    }
+
+    setChatSending(true)
+    try {
+      const response = await fetch('/api/roommate/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          area: state.preferredArea,
+          message,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null
+        throw new Error(payload?.error || 'Failed to send message')
+      }
+
+      setChatInput('')
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Could not send your message right now.'
+      )
+    } finally {
+      setChatSending(false)
     }
   }
 
@@ -390,6 +538,46 @@ export default function RoommateMatchPage() {
               </p>
               <p className="mt-2 text-3xl font-bold text-foreground">{compatibilityScore}/100</p>
               <p className="mt-1 text-sm text-muted-foreground">{compatibilityBand}</p>
+            </div>
+
+            <div className="md:col-span-2 rounded-xl border border-border bg-card p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-electric-blue">
+                Real-Time Roommate Chat
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Live area chat for {areaLabel(state.preferredArea)} comrades.
+              </p>
+
+              <div className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border bg-background p-3">
+                {chatLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading chat...</p>
+                ) : chatMessages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No messages yet. Start the conversation.</p>
+                ) : (
+                  chatMessages.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-border bg-card px-3 py-2">
+                      <p className="text-xs font-semibold text-electric-blue">
+                        {item.senderId === currentUserId ? 'You' : item.senderName}
+                      </p>
+                      <p className="mt-1 text-sm text-foreground">{item.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={sendChatMessage} className="mt-3 flex gap-2">
+                <input
+                  title="Roommate chat input"
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  maxLength={1000}
+                  placeholder="Send a message to this area roomie channel"
+                  className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
+                />
+                <button type="submit" disabled={chatSending} className="cta-electric disabled:opacity-60">
+                  {chatSending ? 'Sending...' : 'Send'}
+                </button>
+              </form>
             </div>
 
             {errorMessage && (

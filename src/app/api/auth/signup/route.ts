@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@/utils/supabase/route'
 import { upsertUser } from '@/utils/supabase/queries'
 
-const SUPABASE_AUTH_PLACEHOLDER_PASSWORD = 'SUPABASE_AUTH'
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -48,6 +46,19 @@ export async function POST(request: NextRequest) {
       return withAuthCookies(NextResponse.json({ error: 'Failed to create account' }, { status: 500 }))
     }
 
+    const identities = signupData.user.identities || []
+    if (!signupData.session && identities.length === 0) {
+      return withAuthCookies(
+        NextResponse.json(
+          {
+            error: 'An account with this email already exists. Please sign in instead.',
+            code: 'ACCOUNT_EXISTS',
+          },
+          { status: 409 }
+        )
+      )
+    }
+
     let appUser: {
       id: string
       fullName: string
@@ -74,10 +85,23 @@ export async function POST(request: NextRequest) {
     }
 
     let isAuthenticated = Boolean(signupData.session)
+    let requiresEmailVerification = false
+    let message: string | undefined
 
     if (!isAuthenticated) {
-      const { data: loginData } = await supabase.auth.signInWithPassword({ email, password })
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
       isAuthenticated = Boolean(loginData.session)
+
+      if (!isAuthenticated) {
+        requiresEmailVerification =
+          Boolean(loginError) && loginError.message.toLowerCase().includes('email not confirmed')
+        message = requiresEmailVerification
+          ? 'Account created. Please verify your email, then sign in.'
+          : 'Account created. Please sign in to continue.'
+      }
     }
 
     return withAuthCookies(
@@ -90,6 +114,8 @@ export async function POST(request: NextRequest) {
             role: appUser.role,
           },
           authenticated: isAuthenticated,
+          requiresEmailVerification,
+          message,
         },
         { status: 201 }
       )

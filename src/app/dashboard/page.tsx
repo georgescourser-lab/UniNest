@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BarChart3,
   BadgeCheck,
+  Bell,
   CheckCircle2,
   CreditCard,
   MapPin,
@@ -15,6 +16,7 @@ import {
   Target,
   Users,
 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 
 interface DashboardListing {
   id: string
@@ -29,6 +31,9 @@ interface DashboardListing {
   lookingForRoommate?: boolean
   reviewCount?: number
   averageRating?: number
+  owner?: {
+    id: string
+  }
 }
 
 interface DashboardUser {
@@ -66,6 +71,13 @@ interface StkPushResponse {
   message?: string
   error?: string
   transaction?: MpesaTransactionSummary
+}
+
+interface LandlordNotification {
+  id: string
+  title: string
+  detail: string
+  createdAt: string
 }
 
 const quickActions = [
@@ -118,6 +130,8 @@ export default function DashboardPage() {
   const [latestCheckoutRequestId, setLatestCheckoutRequestId] = useState('')
   const [latestPaymentStatus, setLatestPaymentStatus] = useState<MpesaTransactionSummary | null>(null)
   const [checkingPaymentStatus, setCheckingPaymentStatus] = useState(false)
+  const [landlordNotifications, setLandlordNotifications] = useState<LandlordNotification[]>([])
+  const [vacancyUpdatingId, setVacancyUpdatingId] = useState('')
 
   useEffect(() => {
     const loadListings = async () => {
@@ -159,6 +173,7 @@ export default function DashboardPage() {
           lookingForRoommate: listing.lookingForRoommate,
           reviewCount: listing.reviewCount,
           averageRating: listing.averageRating,
+          owner: listing.owner,
         }))
 
         setListings(normalized)
@@ -170,6 +185,138 @@ export default function DashboardPage() {
 
     loadListings()
   }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('dashboard-live-vacancy')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'properties' },
+        async () => {
+          try {
+            const response = await fetch('/api/listings?limit=8', { cache: 'no-store' })
+            if (!response.ok) {
+              return
+            }
+
+            const payload = (await response.json()) as { data?: DashboardListing[] }
+            const normalized = (payload.data || []).map((listing) => ({
+              id: listing.id,
+              title: listing.title,
+              price: Number(listing.price),
+              bookingFee: listing.bookingFee ? Number(listing.bookingFee) : null,
+              area: listing.area,
+              zone: listing.zone,
+              location: listing.location,
+              images: listing.images || [],
+              isVerifiedProperty: listing.isVerifiedProperty,
+              lookingForRoommate: listing.lookingForRoommate,
+              reviewCount: listing.reviewCount,
+              averageRating: listing.averageRating,
+              owner: listing.owner,
+            }))
+
+            setListings(normalized)
+          } catch {
+            // Ignore transient realtime refetch errors.
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!user || user.role !== 'LANDLORD') {
+      setLandlordNotifications([])
+      return
+    }
+
+    const mapRequestToNotification = (request: {
+      id: string
+      houseTitle: string
+      tenantName: string
+      time: string
+      createdAt?: string
+    }): LandlordNotification => ({
+      id: request.id,
+      title: `New viewing request for ${request.houseTitle}`,
+      detail: `${request.tenantName} · ${request.time}`,
+      createdAt: request.createdAt || new Date().toISOString(),
+    })
+
+    const loadLandlordNotifications = async () => {
+      try {
+        const response = await fetch('/api/agent/viewing-requests', { cache: 'no-store' })
+        if (!response.ok) {
+          return
+        }
+
+        const payload = (await response.json()) as {
+          data?: Array<{
+            id: string
+            houseTitle: string
+            tenantName: string
+            time: string
+            ownerUserId?: string | null
+            createdAt?: string
+          }>
+        }
+
+        const notifications = (payload.data || [])
+          .filter((item) => item.ownerUserId === user.id)
+          .map(mapRequestToNotification)
+          .slice(0, 6)
+
+        setLandlordNotifications(notifications)
+      } catch {
+        setLandlordNotifications([])
+      }
+    }
+
+    loadLandlordNotifications()
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`landlord-notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'agent_viewing_requests',
+          filter: `owner_user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string
+            house_title: string
+            tenant_name: string
+            time_label: string
+            created_at: string
+          }
+
+          setLandlordNotifications((current) => [
+            {
+              id: row.id,
+              title: `New viewing request for ${row.house_title}`,
+              detail: `${row.tenant_name} · ${row.time_label}`,
+              createdAt: row.created_at,
+            },
+            ...current,
+          ].slice(0, 6))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, user?.role])
 
   const selectedListing = useMemo(
     () => listings.find((item) => item.id === checkoutListingId) || listings[0],
@@ -313,6 +460,29 @@ export default function DashboardPage() {
     }
   }
 
+  const handleMarkOccupied = async (listingId: string) => {
+    setVacancyUpdatingId(listingId)
+    try {
+      const response = await fetch(`/api/listings/${listingId}/vacancy`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: false }),
+      })
+
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to update vacancy status')
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update vacancy status')
+    } finally {
+      setVacancyUpdatingId('')
+    }
+  }
+
   return (
     <section className="section-wrap py-8 md:py-10">
       <div className="surface-card overflow-hidden p-6 md:p-8">
@@ -345,6 +515,27 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+
+            {user?.role === 'LANDLORD' && (
+              <div className="mt-6 rounded-3xl border border-border bg-card p-5">
+                <div className="flex items-center gap-2">
+                  <Bell size={18} className="text-electric-blue" />
+                  <p className="text-sm font-semibold text-foreground">Instant landlord notifications</p>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {landlordNotifications.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No new viewing requests yet.</p>
+                  ) : (
+                    landlordNotifications.map((notification) => (
+                      <div key={notification.id} className="rounded-xl border border-border bg-background px-3 py-2">
+                        <p className="text-sm font-medium text-foreground">{notification.title}</p>
+                        <p className="text-xs text-muted-foreground">{notification.detail}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-3xl border border-electric-blue/20 bg-electric-blue/10 p-5 md:p-6">
@@ -561,9 +752,21 @@ export default function DashboardPage() {
                   <p className="mt-2 text-sm text-muted-foreground">{listing.location}</p>
                   <div className="mt-4 flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">KES {listing.price.toLocaleString()}</span>
-                    <Link href={`/listing/${listing.id}`} className="text-sm font-medium text-electric-blue">
-                      View listing
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link href={`/listing/${listing.id}`} className="text-sm font-medium text-electric-blue">
+                        View listing
+                      </Link>
+                      {(user?.role === 'ADMIN' || listing.owner?.id === user?.id) && (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkOccupied(listing.id)}
+                          disabled={vacancyUpdatingId === listing.id}
+                          className="text-xs font-semibold text-amber-400 disabled:opacity-60"
+                        >
+                          {vacancyUpdatingId === listing.id ? 'Updating...' : 'Mark occupied'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}

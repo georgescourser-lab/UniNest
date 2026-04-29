@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -10,6 +10,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [nextPath, setNextPath] = useState('/profile')
+
+  useEffect(() => {
+    const requestedNext = new URLSearchParams(window.location.search).get('next')
+    const safeNextPath =
+      requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+        ? requestedNext
+        : '/profile'
+    setNextPath(safeNextPath)
+  }, [])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -24,7 +34,7 @@ export default function LoginPage() {
       })
 
       if (response.ok) {
-        router.push('/profile')
+        router.push(nextPath)
         router.refresh()
         return
       }
@@ -77,7 +87,10 @@ export default function LoginPage() {
 
         <p className="mt-4 text-sm text-muted-foreground">
           New here?{' '}
-          <Link href="/signup" className="font-medium text-electric-blue hover:underline">
+          <Link
+            href={nextPath !== '/profile' ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'}
+            className="font-medium text-electric-blue hover:underline"
+          >
             Create an account
           </Link>
         </p>

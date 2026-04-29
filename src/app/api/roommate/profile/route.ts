@@ -6,22 +6,28 @@ import { getRoommateProfile, upsertRoommateProfile } from '@/utils/supabase/quer
 // Define enums locally instead of importing from Prisma
 enum Area {
   KAHAWA_WENDANI = 'KAHAWA_WENDANI',
+  KAHAWA_SUKARI = 'KAHAWA_SUKARI',
+  KM = 'KM',
+  MWIHOKO = 'MWIHOKO',
   GITHURAI_44 = 'GITHURAI_44',
+  GITHURAI_45 = 'GITHURAI_45',
+  RUIRU = 'RUIRU',
   KU_GATE_A = 'KU_GATE_A',
   KU_GATE_B = 'KU_GATE_B',
   KU_GATE_C = 'KU_GATE_C',
   ROYSAMBU = 'ROYSAMBU',
-  KAHAWA_SUKARI = 'KAHAWA_SUKARI',
 }
 
 enum OccupancyType {
   SINGLE = 'SINGLE',
+  TWO_SHARING = 'TWO_SHARING',
   SHARED = 'SHARED',
   EITHER = 'EITHER',
 }
 
 enum SleepRoutine {
   EARLY_BIRD = 'EARLY_BIRD',
+  BALANCED = 'BALANCED',
   NIGHT_OWL = 'NIGHT_OWL',
   FLEXIBLE = 'FLEXIBLE',
 }
@@ -30,9 +36,12 @@ enum CleanlinessPreference {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
   HIGH = 'HIGH',
+  VERY_HIGH = 'VERY_HIGH',
 }
 
 enum GuestPolicy {
+  STRICT = 'STRICT',
+  LIMITED = 'LIMITED',
   NO_GUESTS = 'NO_GUESTS',
   OCCASIONAL = 'OCCASIONAL',
   FLEXIBLE = 'FLEXIBLE',
